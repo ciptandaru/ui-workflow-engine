@@ -50,6 +50,32 @@ export const categories: CategoryDefinition[] = [
 export const nodeDefinitions: NodeDefinition[] = [
   // Triggers
   {
+    id: "manual-trigger",
+    type: "trigger",
+    category: "triggers",
+    label: "Manual Trigger",
+    subtitle: "Run workflow manually",
+    icon: "Play",
+    description: "Triggers workflow execution manually with a button click",
+    color: {
+      border: "border-emerald-400 dark:border-emerald-600",
+      bg: "bg-emerald-100 dark:bg-emerald-900/40",
+      text: "text-emerald-500",
+      iconBg: "bg-emerald-500",
+    },
+    hasInput: false,
+    hasOutput: true,
+    parameters: [
+      {
+        id: "testData",
+        label: "Test Data (JSON)",
+        type: "textarea",
+        value: "{}",
+        placeholder: '{"key": "value"}',
+      },
+    ],
+  },
+  {
     id: "telegram-trigger",
     type: "trigger",
     category: "triggers",
@@ -347,11 +373,26 @@ export const nodeDefinitions: NodeDefinition[] = [
     hasBranch: true,
     parameters: [
       {
-        id: "condition",
-        label: "Condition",
-        type: "text",
-        value: "",
-        placeholder: "e.g., data.value > 10",
+        id: "conditions",
+        label: "Conditions",
+        type: "conditions",
+        value: {
+          groups: [
+            {
+              id: "group-1",
+              logic: "and",
+              conditions: [
+                {
+                  id: "condition-1",
+                  field: "",
+                  operator: "equals",
+                  value: "",
+                },
+              ],
+            },
+          ],
+          groupLogic: "and",
+        },
       },
     ],
   },

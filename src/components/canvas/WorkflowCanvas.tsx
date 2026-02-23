@@ -305,12 +305,8 @@ const WorkflowCanvasInner: React.FC = () => {
         useWorkflowStore.getState().closeRightPanel();
       }
 
-      // Delete selected node
-      if (
-        (e.key === "Delete" || e.key === "Backspace") &&
-        !e.metaKey &&
-        !e.ctrlKey
-      ) {
+      // Delete selected node (only Delete key, not Backspace)
+      if (e.key === "Delete" && !e.metaKey && !e.ctrlKey) {
         if (selectedNodeId) {
           deleteNode(selectedNodeId);
         }

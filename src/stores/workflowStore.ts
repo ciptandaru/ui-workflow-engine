@@ -6,6 +6,7 @@ import {
   WorkflowNode,
   WorkflowEdge,
   NodeCategory,
+  ConditionsConfig,
 } from "../types";
 import { getNodeDefinition } from "../utils/nodeConfig";
 
@@ -357,7 +358,10 @@ export const useWorkflowStore = create<WorkflowState>()(
                   acc[p.id] = p.value;
                   return acc;
                 },
-                {} as Record<string, string | number | boolean>,
+                {} as Record<
+                  string,
+                  string | number | boolean | ConditionsConfig
+                >,
               ) || {},
             output: {},
           },
@@ -572,7 +576,10 @@ export const useWorkflowStore = create<WorkflowState>()(
                   acc[p.id] = p.value;
                   return acc;
                 },
-                {} as Record<string, string | number | boolean>,
+                {} as Record<
+                  string,
+                  string | number | boolean | ConditionsConfig
+                >,
               ) || {},
             output: {},
           },
@@ -800,7 +807,10 @@ export const useWorkflowStore = create<WorkflowState>()(
                   acc[p.id] = p.value;
                   return acc;
                 },
-                {} as Record<string, string | number | boolean>,
+                {} as Record<
+                  string,
+                  string | number | boolean | ConditionsConfig
+                >,
               ) || {},
             output: {},
           },

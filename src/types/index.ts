@@ -35,10 +35,37 @@ export interface NodeDefinition {
 export interface NodeParameter {
   id: string;
   label: string;
-  type: "text" | "number" | "select" | "textarea" | "checkbox";
-  value: string | number | boolean;
+  type: "text" | "number" | "select" | "textarea" | "checkbox" | "conditions";
+  value: string | number | boolean | ConditionsConfig;
   options?: { label: string; value: string }[];
   placeholder?: string;
+}
+
+// Condition types for If/Else node
+export interface ConditionRule {
+  id: string;
+  field: string;
+  operator:
+    | "equals"
+    | "not_equals"
+    | "contains"
+    | "not_contains"
+    | "greater_than"
+    | "less_than"
+    | "is_empty"
+    | "is_not_empty";
+  value: string;
+}
+
+export interface ConditionGroup {
+  id: string;
+  logic: "and" | "or";
+  conditions: ConditionRule[];
+}
+
+export interface ConditionsConfig {
+  groups: ConditionGroup[];
+  groupLogic: "and" | "or";
 }
 
 // Workflow Types
@@ -49,7 +76,7 @@ export interface WorkflowNode {
   data: {
     label: string;
     nodeType: string;
-    parameters?: Record<string, string | number | boolean>;
+    parameters?: Record<string, string | number | boolean | ConditionsConfig>;
     output?: Record<string, unknown>;
   };
 }
