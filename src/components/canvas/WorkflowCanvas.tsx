@@ -25,6 +25,7 @@ import {
   Scissors,
   Clipboard,
   Settings,
+  Grid3X3,
 } from "lucide-react";
 import { useWorkflowStore } from "../../stores/workflowStore";
 import { WorkflowNode } from "./WorkflowNode";
@@ -46,6 +47,7 @@ const WorkflowCanvasInner: React.FC = () => {
     workflows,
     activeWorkflowId,
     addEdge: addWorkflowEdge,
+    updateNodePosition,
     isAddNodePanelOpen,
     isDarkMode,
     openAddNodePanel,
@@ -57,6 +59,7 @@ const WorkflowCanvasInner: React.FC = () => {
     cutNode,
     copiedNode,
     pasteNode,
+    layoutNodes,
   } = useWorkflowStore();
 
   const [showMinimap, setShowMinimap] = useState(false);
@@ -101,40 +104,82 @@ const WorkflowCanvasInner: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync nodes with store
+  // Track if we're currently dragging to prevent sync during drag
+  const isDraggingRef = useRef(false);
+
+  // Store the last synced node/edge IDs to detect structural changes
+  const lastNodeIdsRef = useRef<string>("");
+  const lastEdgeIdsRef = useRef<string>("");
+
+  // Sync nodes with store only when workflow structure changes (add/remove nodes/edges)
+  // NOT when positions change
   useEffect(() => {
-    if (activeWorkflow) {
-      setNodes(
-        activeWorkflow.nodes.map((node) => ({
-          id: node.id,
-          type: "workflowNode",
-          position: node.position,
-          data: {
-            ...node.data,
-            nodeDefinitionId: node.type, // Store the node definition ID
-          },
-        })),
-      );
-      setEdges(
-        activeWorkflow.edges.map((edge) => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          sourceHandle: edge.sourceHandle,
-          targetHandle: edge.targetHandle,
-          type: "workflowEdge",
-          animated: edge.animated,
-        })),
-      );
+    if (activeWorkflow && !isDraggingRef.current) {
+      // Create a key based on node and edge IDs (not positions)
+      const nodeIds = activeWorkflow.nodes
+        .map((n) => n.id)
+        .sort()
+        .join(",");
+      const edgeIds = activeWorkflow.edges
+        .map((e) => e.id)
+        .sort()
+        .join(",");
+
+      // Only sync if structure changed (nodes/edges added/removed)
+      if (
+        lastNodeIdsRef.current !== nodeIds ||
+        lastEdgeIdsRef.current !== edgeIds
+      ) {
+        lastNodeIdsRef.current = nodeIds;
+        lastEdgeIdsRef.current = edgeIds;
+
+        setNodes(
+          activeWorkflow.nodes.map((node) => ({
+            id: node.id,
+            type: "workflowNode",
+            position: node.position,
+            data: {
+              ...node.data,
+              nodeDefinitionId: node.type, // Store the node definition ID
+            },
+          })),
+        );
+        setEdges(
+          activeWorkflow.edges.map((edge) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            type: "workflowEdge",
+            animated: edge.animated,
+          })),
+        );
+      }
     }
   }, [activeWorkflowId, activeWorkflow, setNodes, setEdges]);
 
   // Handle node position changes
   const handleNodesChange: OnNodesChange = useCallback(
     (changes) => {
+      // Mark that we're starting a drag
+      const hasPositionChange = changes.some((c) => c.type === "position");
+      if (hasPositionChange) {
+        isDraggingRef.current = true;
+      }
+
       onNodesChange(changes);
     },
     [onNodesChange],
+  );
+
+  // Handle node drag stop - save position to store
+  const onNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      isDraggingRef.current = false;
+      updateNodePosition(node.id, node.position);
+    },
+    [updateNodePosition],
   );
 
   // Handle new connections
@@ -312,6 +357,7 @@ const WorkflowCanvasInner: React.FC = () => {
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={onPaneClick}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -399,6 +445,20 @@ const WorkflowCanvasInner: React.FC = () => {
           title="Search"
         >
           <Search className="w-5 h-5" />
+        </button>
+
+        {/* Auto Layout Button */}
+        <button
+          onClick={() => layoutNodes()}
+          className={cn(
+            "w-10 h-10 rounded-lg flex items-center justify-center shadow-lg transition-all",
+            "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700",
+            "hover:bg-gray-50 dark:hover:bg-gray-700",
+            "text-gray-700 dark:text-gray-300",
+          )}
+          title="Auto Layout - Rapikan tampilan node"
+        >
+          <Grid3X3 className="w-5 h-5" />
         </button>
       </div>
 

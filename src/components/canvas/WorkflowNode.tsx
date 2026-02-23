@@ -132,10 +132,15 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
               onMouseEnter={() => setShowAddButton(true)}
               onMouseLeave={() => setShowAddButton(false)}
             >
-              {/* Connector Line - only show if no outgoing connection */}
-              {!hasOutgoingConnection && (
-                <div className="w-6 h-0.5 bg-gray-300 dark:bg-gray-600" />
-              )}
+              {/* Connector Line - always show for consistent positioning */}
+              <div
+                className={cn(
+                  "w-6 h-0.5 transition-colors",
+                  hasOutgoingConnection
+                    ? "bg-gray-400 dark:bg-gray-500"
+                    : "bg-gray-300 dark:bg-gray-600",
+                )}
+              />
               {/* Main Output Handle - always present for connections */}
               <Handle
                 type="source"
@@ -144,7 +149,7 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
                 className={cn(
                   "!w-4 !h-4 !rounded-full !border-2 !border-white dark:!border-gray-800 !transition-all !cursor-crosshair",
                   hasOutgoingConnection
-                    ? "!bg-gray-400 dark:!bg-gray-500 hover:!bg-blue-500 hover:!scale-125"
+                    ? "!bg-blue-500 hover:!bg-blue-600 hover:!scale-125"
                     : "!bg-white dark:!bg-gray-800 !border-dashed !border-gray-300 dark:!border-gray-600 hover:!border-blue-500 hover:!scale-110",
                 )}
                 style={{ position: "relative", transform: "none", top: "auto" }}
@@ -179,10 +184,15 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
                 onMouseEnter={() => setShowAddButton(true)}
                 onMouseLeave={() => setShowAddButton(false)}
               >
-                {/* Connector Line - only if no connection */}
-                {!hasHandleConnection("true") && (
-                  <div className="w-5 h-0.5 bg-gray-300 dark:bg-gray-600" />
-                )}
+                {/* Connector Line - always show for consistent positioning */}
+                <div
+                  className={cn(
+                    "w-5 h-0.5 transition-colors",
+                    hasHandleConnection("true")
+                      ? "bg-green-500 dark:bg-green-400"
+                      : "bg-gray-300 dark:bg-gray-600",
+                  )}
+                />
                 {/* True Handle */}
                 <Handle
                   type="source"
@@ -230,10 +240,15 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
                 onMouseEnter={() => setShowAddButton(true)}
                 onMouseLeave={() => setShowAddButton(false)}
               >
-                {/* Connector Line - only if no connection */}
-                {!hasHandleConnection("false") && (
-                  <div className="w-5 h-0.5 bg-gray-300 dark:bg-gray-600" />
-                )}
+                {/* Connector Line - always show for consistent positioning */}
+                <div
+                  className={cn(
+                    "w-5 h-0.5 transition-colors",
+                    hasHandleConnection("false")
+                      ? "bg-red-500 dark:bg-red-400"
+                      : "bg-gray-300 dark:bg-gray-600",
+                  )}
+                />
                 {/* False Handle */}
                 <Handle
                   type="source"

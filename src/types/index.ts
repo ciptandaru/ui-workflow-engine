@@ -100,8 +100,15 @@ export interface WorkflowState {
   updateWorkflow: (id: string, updates: Partial<Workflow>) => void;
 
   // Node Actions
-  addNode: (nodeType: string, position?: { x: number; y: number }) => void;
+  addNode: (
+    nodeType: string,
+    position?: { x: number; y: number },
+  ) => string | undefined;
   updateNode: (nodeId: string, data: Partial<WorkflowNode["data"]>) => void;
+  updateNodePosition: (
+    nodeId: string,
+    position: { x: number; y: number },
+  ) => void;
   deleteNode: (nodeId: string) => void;
   setSelectedNode: (nodeId: string | null) => void;
 
@@ -139,6 +146,9 @@ export interface WorkflowState {
   pasteNode: (position?: { x: number; y: number }) => void;
   cutNode: (nodeId: string) => void;
   copiedNode: WorkflowNode | null;
+
+  // Layout Actions
+  layoutNodes: () => void;
 
   // Persistence
   saveToLocalStorage: () => void;

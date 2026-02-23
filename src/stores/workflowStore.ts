@@ -400,6 +400,26 @@ export const useWorkflowStore = create<WorkflowState>()(
         get().saveToLocalStorage();
       },
 
+      updateNodePosition: (
+        nodeId: string,
+        position: { x: number; y: number },
+      ) => {
+        set((state) => ({
+          workflows: state.workflows.map((w) =>
+            w.id === state.activeWorkflowId
+              ? {
+                  ...w,
+                  nodes: w.nodes.map((n) =>
+                    n.id === nodeId ? { ...n, position } : n,
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : w,
+          ),
+        }));
+        get().saveToLocalStorage();
+      },
+
       deleteNode: (nodeId: string) => {
         set((state) => ({
           workflows: state.workflows.map((w) =>
@@ -945,6 +965,119 @@ export const useWorkflowStore = create<WorkflowState>()(
           ),
           selectedNodeId: newNodeId,
           isRightPanelOpen: true,
+        }));
+
+        get().saveToLocalStorage();
+      },
+
+      layoutNodes: () => {
+        const state = get();
+        const activeWorkflow = state.workflows.find(
+          (w) => w.id === state.activeWorkflowId,
+        );
+        if (!activeWorkflow || activeWorkflow.nodes.length === 0) return;
+
+        const nodes = activeWorkflow.nodes;
+        const edges = activeWorkflow.edges;
+
+        // Find root nodes (nodes with no incoming edges)
+        const targetNodeIds = new Set(edges.map((e) => e.target));
+        const rootNodes = nodes.filter((n) => !targetNodeIds.has(n.id));
+
+        // Build adjacency list
+        const adjacencyList = new Map<string, string[]>();
+        nodes.forEach((n) => adjacencyList.set(n.id, []));
+        edges.forEach((e) => {
+          const children = adjacencyList.get(e.source) || [];
+          children.push(e.target);
+          adjacencyList.set(e.source, children);
+        });
+
+        // Calculate levels using BFS
+        const nodeLevels = new Map<string, number>();
+        const queue: { id: string; level: number }[] = [];
+
+        // Start with root nodes at level 0
+        rootNodes.forEach((n) => queue.push({ id: n.id, level: 0 }));
+
+        while (queue.length > 0) {
+          const { id, level } = queue.shift()!;
+
+          // If node already has a higher level, skip
+          if (nodeLevels.has(id) && (nodeLevels.get(id) || 0) >= level)
+            continue;
+
+          nodeLevels.set(id, level);
+
+          // Add children to queue
+          const children = adjacencyList.get(id) || [];
+          children.forEach((childId) => {
+            queue.push({ id: childId, level: level + 1 });
+          });
+        }
+
+        // Handle nodes not reached from roots (disconnected or cycles)
+        nodes.forEach((n) => {
+          if (!nodeLevels.has(n.id)) {
+            nodeLevels.set(n.id, 0);
+          }
+        });
+
+        // Group nodes by level
+        const levelGroups = new Map<number, string[]>();
+        nodeLevels.forEach((level, nodeId) => {
+          const group = levelGroups.get(level) || [];
+          group.push(nodeId);
+          levelGroups.set(level, group);
+        });
+
+        // Calculate new positions
+        const NODE_SPACING_X = 280;
+        const NODE_SPACING_Y = 120;
+        const START_X = 100;
+        const START_Y = 100;
+
+        const newPositions = new Map<string, { x: number; y: number }>();
+
+        // Sort levels and position nodes
+        const sortedLevels = Array.from(levelGroups.keys()).sort(
+          (a, b) => a - b,
+        );
+
+        sortedLevels.forEach((level) => {
+          const nodeIds = levelGroups.get(level) || [];
+
+          // Sort nodes within level for consistent ordering
+          nodeIds.sort((a, b) => {
+            const nodeA = nodes.find((n) => n.id === a);
+            const nodeB = nodes.find((n) => n.id === b);
+            return (nodeA?.data.label || "").localeCompare(
+              nodeB?.data.label || "",
+            );
+          });
+
+          nodeIds.forEach((nodeId, index) => {
+            newPositions.set(nodeId, {
+              x: START_X + level * NODE_SPACING_X,
+              y: START_Y + index * NODE_SPACING_Y,
+            });
+          });
+        });
+
+        // Update nodes with new positions
+        set((state) => ({
+          workflows: state.workflows.map((w) =>
+            w.id === state.activeWorkflowId
+              ? {
+                  ...w,
+                  nodes: w.nodes.map((n) => ({
+                    ...n,
+                    position: newPositions.get(n.id) || n.position,
+                  })),
+                  updatedAt: new Date().toISOString(),
+                }
+              : w,
+          ),
         }));
 
         get().saveToLocalStorage();
