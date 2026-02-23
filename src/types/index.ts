@@ -90,6 +90,8 @@ export interface WorkflowState {
   anpCategory: NodeCategory | null;
   anpSearchQuery: string;
   anpEdgeInsertId: string | null;
+  anpSourceNodeId: string | null;
+  anpSourceHandle: string | null;
 
   // Actions
   setActiveWorkflow: (id: string) => void;
@@ -119,11 +121,17 @@ export interface WorkflowState {
   openRightPanel: () => void;
   closeRightPanel: () => void;
   toggleAddNodePanel: () => void;
-  openAddNodePanel: () => void;
+  openAddNodePanel: (category?: NodeCategory) => void;
+  openAddNodePanelForSource: (nodeId: string, sourceHandle?: string) => void;
   closeAddNodePanel: () => void;
   setAnpCategory: (category: NodeCategory | null) => void;
   setAnpSearchQuery: (query: string) => void;
   setAnpEdgeInsertId: (edgeId: string | null) => void;
+  addNodeAndConnect: (
+    nodeType: string,
+    sourceNodeId: string,
+    sourceHandle?: string,
+  ) => void;
 
   // Persistence
   saveToLocalStorage: () => void;

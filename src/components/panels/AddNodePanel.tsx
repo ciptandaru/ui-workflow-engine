@@ -19,9 +19,11 @@ export const AddNodePanel: React.FC = () => {
     anpSearchQuery,
     setAnpSearchQuery,
     anpEdgeInsertId,
-    setAnpEdgeInsertId,
+    anpSourceNodeId,
+    anpSourceHandle,
     addNode,
     insertNodeOnEdge,
+    addNodeAndConnect,
     openRightPanel,
   } = useWorkflowStore();
 
@@ -34,15 +36,6 @@ export const AddNodePanel: React.FC = () => {
     }
   }, [isAddNodePanelOpen]);
 
-  // Reset state when panel closes
-  useEffect(() => {
-    if (!isAddNodePanelOpen) {
-      setAnpCategory(null);
-      setAnpSearchQuery("");
-      setAnpEdgeInsertId(null);
-    }
-  }, [isAddNodePanelOpen]);
-
   const handleNodeClick = (nodeType: string) => {
     if (anpEdgeInsertId) {
       // Insert node on edge
@@ -50,6 +43,15 @@ export const AddNodePanel: React.FC = () => {
       closeAddNodePanel();
       setTimeout(() => {
         insertNodeOnEdge(edgeId, nodeType);
+        openRightPanel();
+      }, 100);
+    } else if (anpSourceNodeId) {
+      // Add node and connect to source
+      const sourceId = anpSourceNodeId;
+      const sourceHandle = anpSourceHandle;
+      closeAddNodePanel();
+      setTimeout(() => {
+        addNodeAndConnect(nodeType, sourceId, sourceHandle || undefined);
         openRightPanel();
       }, 100);
     } else {
@@ -87,7 +89,13 @@ export const AddNodePanel: React.FC = () => {
                 Insert node
               </span>
             )}
-            {!anpEdgeInsertId && (
+            {anpSourceNodeId && !anpEdgeInsertId && (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium rounded-full flex items-center gap-1">
+                <ArrowRight className="w-3 h-3" />
+                Add next node
+              </span>
+            )}
+            {!anpEdgeInsertId && !anpSourceNodeId && (
               <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
                 What happens next?
               </h2>
@@ -122,6 +130,15 @@ export const AddNodePanel: React.FC = () => {
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <p className="text-sm text-red-700 dark:text-red-300">
               Pilih node untuk disisipkan di antara koneksi
+            </p>
+          </div>
+        )}
+
+        {/* Add Next Node Banner */}
+        {anpSourceNodeId && !anpEdgeInsertId && (
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Pilih node untuk melanjutkan flow
             </p>
           </div>
         )}

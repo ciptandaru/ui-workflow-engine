@@ -1,5 +1,6 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
+import { Plus } from "lucide-react";
 import { getIcon } from "../../lib/icons";
 import { getNodeDefinition } from "../../utils/nodeConfig";
 import { useWorkflowStore } from "../../stores/workflowStore";
@@ -16,8 +17,15 @@ interface WorkflowNodeData {
 export const WorkflowNode: React.FC<NodeProps> = memo(
   ({ id, data, selected }) => {
     const nodeData = data as unknown as WorkflowNodeData;
-    const { setSelectedNode, openRightPanel, deleteNode, selectedNodeId } =
-      useWorkflowStore();
+    const {
+      setSelectedNode,
+      openRightPanel,
+      deleteNode,
+      selectedNodeId,
+      openAddNodePanelForSource,
+    } = useWorkflowStore();
+
+    const [showAddButton, setShowAddButton] = useState(false);
 
     const nodeDef = getNodeDefinition(
       nodeData.nodeDefinitionId || nodeData.nodeType || "telegram-trigger",
@@ -38,6 +46,11 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
     const handleDoubleClick = () => {
       setSelectedNode(id);
       openRightPanel();
+    };
+
+    const handleAddNodeClick = (e: React.MouseEvent, sourceHandle?: string) => {
+      e.stopPropagation();
+      openAddNodePanelForSource(id, sourceHandle);
     };
 
     const isSelected = selectedNodeId === id;
@@ -96,11 +109,38 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
 
         {/* Output Handles */}
         {nodeDef.hasOutput && !nodeDef.hasBranch && (
-          <Handle
-            type="source"
-            position={Position.Right}
-            className="!w-3 !h-3 !bg-gray-400 dark:!bg-gray-500 !border-2 !border-white dark:!border-gray-800 hover:!bg-blue-500 transition-colors"
-          />
+          <>
+            <Handle
+              type="source"
+              position={Position.Right}
+              className="!w-3 !h-3 !bg-gray-400 dark:!bg-gray-500 !border-2 !border-white dark:!border-gray-800 hover:!bg-blue-500 transition-colors"
+            />
+            {/* Add Node Button with Connector Line */}
+            <div
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full flex items-center"
+              onMouseEnter={() => setShowAddButton(true)}
+              onMouseLeave={() => setShowAddButton(false)}
+            >
+              {/* Connector Line */}
+              <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-600" />
+              {/* Add Button */}
+              <button
+                onClick={(e) => handleAddNodeClick(e)}
+                className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center transition-all",
+                  "bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600",
+                  "hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30",
+                  showAddButton
+                    ? "opacity-100 scale-110"
+                    : "opacity-0 scale-100",
+                  "group-hover:opacity-100 group-hover:scale-100",
+                )}
+                title="Add next node"
+              >
+                <Plus className="w-3 h-3 text-gray-400 dark:text-gray-500 hover:text-blue-500" />
+              </button>
+            </div>
+          </>
         )}
 
         {/* Branch Handles (If/Else) */}
@@ -128,6 +168,51 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
             </div>
             <div className="absolute right-0 top-[70%] translate-x-full pr-1 text-xs text-red-600 dark:text-red-400 font-medium">
               F
+            </div>
+            {/* Add Node Buttons for Branch Handles */}
+            <div
+              className="absolute right-0 top-[30%] translate-x-full translate-y-[-50%] flex items-center"
+              onMouseEnter={() => setShowAddButton(true)}
+              onMouseLeave={() => setShowAddButton(false)}
+            >
+              <div className="w-6 h-0.5 bg-gray-300 dark:bg-gray-600" />
+              <button
+                onClick={(e) => handleAddNodeClick(e, "true")}
+                className={cn(
+                  "w-4 h-4 rounded-full flex items-center justify-center transition-all",
+                  "bg-white dark:bg-gray-800 border-2 border-dashed border-green-300 dark:border-green-600",
+                  "hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/30",
+                  showAddButton
+                    ? "opacity-100 scale-110"
+                    : "opacity-0 scale-100",
+                  "group-hover:opacity-100 group-hover:scale-100",
+                )}
+                title="Add node (True branch)"
+              >
+                <Plus className="w-2.5 h-2.5 text-green-400 dark:text-green-500 hover:text-green-500" />
+              </button>
+            </div>
+            <div
+              className="absolute right-0 top-[70%] translate-x-full translate-y-[-50%] flex items-center"
+              onMouseEnter={() => setShowAddButton(true)}
+              onMouseLeave={() => setShowAddButton(false)}
+            >
+              <div className="w-6 h-0.5 bg-gray-300 dark:bg-gray-600" />
+              <button
+                onClick={(e) => handleAddNodeClick(e, "false")}
+                className={cn(
+                  "w-4 h-4 rounded-full flex items-center justify-center transition-all",
+                  "bg-white dark:bg-gray-800 border-2 border-dashed border-red-300 dark:border-red-600",
+                  "hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/30",
+                  showAddButton
+                    ? "opacity-100 scale-110"
+                    : "opacity-0 scale-100",
+                  "group-hover:opacity-100 group-hover:scale-100",
+                )}
+                title="Add node (False branch)"
+              >
+                <Plus className="w-2.5 h-2.5 text-red-400 dark:text-red-500 hover:text-red-500" />
+              </button>
             </div>
           </>
         )}

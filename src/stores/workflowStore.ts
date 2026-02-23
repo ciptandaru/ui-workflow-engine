@@ -259,6 +259,8 @@ const initialState = {
   anpCategory: null,
   anpSearchQuery: "",
   anpEdgeInsertId: null,
+  anpSourceNodeId: null,
+  anpSourceHandle: null,
 };
 
 export const useWorkflowStore = create<WorkflowState>()(
@@ -632,11 +634,24 @@ export const useWorkflowStore = create<WorkflowState>()(
         }));
       },
 
-      openAddNodePanel: () => {
+      openAddNodePanel: (category?: NodeCategory) => {
+        set({
+          isAddNodePanelOpen: true,
+          anpCategory: category || null,
+          anpSearchQuery: "",
+          anpSourceNodeId: null,
+          anpSourceHandle: null,
+        });
+      },
+
+      openAddNodePanelForSource: (nodeId: string, sourceHandle?: string) => {
         set({
           isAddNodePanelOpen: true,
           anpCategory: null,
           anpSearchQuery: "",
+          anpSourceNodeId: nodeId,
+          anpSourceHandle: sourceHandle || null,
+          anpEdgeInsertId: null,
         });
       },
 
@@ -646,6 +661,8 @@ export const useWorkflowStore = create<WorkflowState>()(
           anpCategory: null,
           anpSearchQuery: "",
           anpEdgeInsertId: null,
+          anpSourceNodeId: null,
+          anpSourceHandle: null,
         });
       },
 
@@ -659,6 +676,83 @@ export const useWorkflowStore = create<WorkflowState>()(
 
       setAnpEdgeInsertId: (edgeId: string | null) => {
         set({ anpEdgeInsertId: edgeId });
+      },
+
+      addNodeAndConnect: (
+        nodeType: string,
+        sourceNodeId: string,
+        sourceHandle?: string,
+      ) => {
+        const state = get();
+        const activeWorkflow = state.workflows.find(
+          (w) => w.id === state.activeWorkflowId,
+        );
+        if (!activeWorkflow) return;
+
+        const nodeDef = getNodeDefinition(nodeType);
+        if (!nodeDef) return;
+
+        // Find source node to calculate position
+        const sourceNode = activeWorkflow.nodes.find(
+          (n) => n.id === sourceNodeId,
+        );
+        const NODE_SPACING = 250;
+
+        const newPosition = sourceNode
+          ? {
+              x: sourceNode.position.x + NODE_SPACING,
+              y: sourceNode.position.y,
+            }
+          : { x: 400 + Math.random() * 200, y: 200 + Math.random() * 100 };
+
+        const newNodeId = `node-${Date.now()}`;
+        const newNode: WorkflowNode = {
+          id: newNodeId,
+          type: nodeType,
+          position: newPosition,
+          data: {
+            label: nodeDef.label,
+            nodeType: nodeDef.type,
+            parameters:
+              nodeDef.parameters?.reduce(
+                (acc, p) => {
+                  acc[p.id] = p.value;
+                  return acc;
+                },
+                {} as Record<string, string | number | boolean>,
+              ) || {},
+            output: {},
+          },
+        };
+
+        // Create edge from source to new node
+        const newEdge: WorkflowEdge = {
+          id: `edge-${Date.now()}`,
+          source: sourceNodeId,
+          target: newNodeId,
+          sourceHandle: sourceHandle,
+          type: "smoothstep",
+          animated: true,
+        };
+
+        set((state) => ({
+          workflows: state.workflows.map((w) =>
+            w.id === state.activeWorkflowId
+              ? {
+                  ...w,
+                  nodes: [...w.nodes, newNode],
+                  edges: [...w.edges, newEdge],
+                  updatedAt: new Date().toISOString(),
+                }
+              : w,
+          ),
+          selectedNodeId: newNodeId,
+          isRightPanelOpen: true,
+          anpSourceNodeId: null,
+          anpSourceHandle: null,
+        }));
+
+        get().saveToLocalStorage();
       },
 
       // Persistence
