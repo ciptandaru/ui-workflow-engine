@@ -17,7 +17,15 @@ import {
   ReactFlowProvider,
   OnMove,
 } from "@xyflow/react";
-import { Plus, Search } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Copy,
+  Trash2,
+  Scissors,
+  Clipboard,
+  Settings,
+} from "lucide-react";
 import { useWorkflowStore } from "../../stores/workflowStore";
 import { WorkflowNode } from "./WorkflowNode";
 import { WorkflowEdge } from "./WorkflowEdge";
@@ -41,10 +49,27 @@ const WorkflowCanvasInner: React.FC = () => {
     isAddNodePanelOpen,
     isDarkMode,
     openAddNodePanel,
+    setSelectedNode,
+    openRightPanel,
+    deleteNode,
+    duplicateNode,
+    copyNode,
+    cutNode,
+    copiedNode,
+    pasteNode,
   } = useWorkflowStore();
 
   const [showMinimap, setShowMinimap] = useState(false);
   const minimapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    nodeId: string | null;
+    isCanvas: boolean;
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const activeWorkflow = workflows.find((w) => w.id === activeWorkflowId);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -149,9 +174,80 @@ const WorkflowCanvasInner: React.FC = () => {
     };
   }, []);
 
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(e.target as HTMLElement)
+      ) {
+        setContextMenu(null);
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  // Handle node right-click context menu
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectedNode(node.id);
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: node.id,
+        isCanvas: false,
+      });
+    },
+    [setSelectedNode],
+  );
+
+  // Handle pane (canvas) right-click context menu
+  const onPaneContextMenu = useCallback(
+    (event: MouseEvent | React.MouseEvent) => {
+      event.preventDefault();
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeId: null,
+        isCanvas: true,
+      });
+    },
+    [],
+  );
+
+  // Handle pane click to close context menu
+  const onPaneClick = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const {
+        selectedNodeId,
+        deleteNode,
+        duplicateNode,
+        copyNode,
+        pasteNode,
+        cutNode,
+        copiedNode,
+      } = useWorkflowStore.getState();
+
       // Tab to toggle Add Node Panel
       if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
@@ -170,10 +266,33 @@ const WorkflowCanvasInner: React.FC = () => {
         !e.metaKey &&
         !e.ctrlKey
       ) {
-        const { selectedNodeId, deleteNode } = useWorkflowStore.getState();
         if (selectedNodeId) {
           deleteNode(selectedNodeId);
         }
+      }
+
+      // Copy: Ctrl+C or Cmd+C
+      if (e.key === "c" && (e.ctrlKey || e.metaKey) && selectedNodeId) {
+        e.preventDefault();
+        copyNode(selectedNodeId);
+      }
+
+      // Cut: Ctrl+X or Cmd+X
+      if (e.key === "x" && (e.ctrlKey || e.metaKey) && selectedNodeId) {
+        e.preventDefault();
+        cutNode(selectedNodeId);
+      }
+
+      // Paste: Ctrl+V or Cmd+V
+      if (e.key === "v" && (e.ctrlKey || e.metaKey) && copiedNode) {
+        e.preventDefault();
+        pasteNode();
+      }
+
+      // Duplicate: Ctrl+D or Cmd+D
+      if (e.key === "d" && (e.ctrlKey || e.metaKey) && selectedNodeId) {
+        e.preventDefault();
+        duplicateNode(selectedNodeId);
       }
     };
 
@@ -190,6 +309,9 @@ const WorkflowCanvasInner: React.FC = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onMove={onMove}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneContextMenu={onPaneContextMenu}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
@@ -365,6 +487,188 @@ const WorkflowCanvasInner: React.FC = () => {
         <span className="mx-2">·</span>
         <span>Del = delete</span>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-[1000] min-w-[180px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 overflow-hidden"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+        >
+          {/* Canvas Context Menu */}
+          {contextMenu.isCanvas ? (
+            <>
+              {/* Header */}
+              <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Canvas Actions
+                </span>
+              </div>
+
+              {/* Add Node Button */}
+              <button
+                onClick={() => {
+                  setContextMenu(null);
+                  openAddNodePanel();
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="flex-1 text-left">Add Node</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  Tab
+                </span>
+              </button>
+
+              {/* Paste Button - only shown if there's a copied node */}
+              <button
+                onClick={() => {
+                  if (copiedNode) {
+                    pasteNode({ x: contextMenu.x, y: contextMenu.y });
+                  }
+                  setContextMenu(null);
+                }}
+                disabled={!copiedNode}
+                className={cn(
+                  "w-full px-3 py-2 flex items-center gap-3 text-sm transition-colors",
+                  copiedNode
+                    ? "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    : "opacity-50 cursor-not-allowed text-gray-700 dark:text-gray-300",
+                )}
+              >
+                <Clipboard className="w-4 h-4" />
+                <span className="flex-1 text-left">Paste</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  ⌘V
+                </span>
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Node Context Menu */}
+              {/* Header */}
+              <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Node Actions
+                </span>
+              </div>
+
+              {/* Menu Items */}
+              <button
+                onClick={() => {
+                  if (contextMenu.nodeId) {
+                    setSelectedNode(contextMenu.nodeId);
+                    openRightPanel();
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="flex-1 text-left">Edit</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  ⏎
+                </span>
+              </button>
+
+              <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+
+              <button
+                onClick={() => {
+                  if (contextMenu.nodeId) {
+                    duplicateNode(contextMenu.nodeId);
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Copy className="w-4 h-4" />
+                <span className="flex-1 text-left">Duplicate</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  ⌘D
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (contextMenu.nodeId) {
+                    copyNode(contextMenu.nodeId);
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Clipboard className="w-4 h-4" />
+                <span className="flex-1 text-left">Copy</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  ⌘C
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (contextMenu.nodeId) {
+                    cutNode(contextMenu.nodeId);
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Scissors className="w-4 h-4" />
+                <span className="flex-1 text-left">Cut</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  ⌘X
+                </span>
+              </button>
+
+              <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+
+              <button
+                onClick={() => {
+                  if (copiedNode) {
+                    pasteNode({ x: contextMenu.x + 50, y: contextMenu.y + 50 });
+                  }
+                  setContextMenu(null);
+                }}
+                disabled={!copiedNode}
+                className={cn(
+                  "w-full px-3 py-2 flex items-center gap-3 text-sm transition-colors",
+                  copiedNode
+                    ? "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    : "opacity-50 cursor-not-allowed text-gray-700 dark:text-gray-300",
+                )}
+              >
+                <Clipboard className="w-4 h-4" />
+                <span className="flex-1 text-left">Paste</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  ⌘V
+                </span>
+              </button>
+
+              <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+
+              <button
+                onClick={() => {
+                  if (contextMenu.nodeId) {
+                    deleteNode(contextMenu.nodeId);
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 flex items-center gap-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="flex-1 text-left">Delete</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                  ⌫
+                </span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

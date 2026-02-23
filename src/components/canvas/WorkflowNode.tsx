@@ -1,5 +1,5 @@
-import React, { memo, useState } from "react";
-import { Handle, Position, NodeProps } from "@xyflow/react";
+import React, { memo, useState, useMemo } from "react";
+import { Handle, Position, NodeProps, useEdges } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { getIcon } from "../../lib/icons";
 import { getNodeDefinition } from "../../utils/nodeConfig";
@@ -25,11 +25,27 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
       openAddNodePanelForSource,
     } = useWorkflowStore();
 
+    // Use useEdges hook to get edges reactively
+    const edges = useEdges();
+
     const [showAddButton, setShowAddButton] = useState(false);
 
     const nodeDef = getNodeDefinition(
       nodeData.nodeDefinitionId || nodeData.nodeType || "telegram-trigger",
     );
+
+    // Check if this node has any outgoing connections
+    const hasOutgoingConnection = useMemo(() => {
+      return edges.some((edge) => edge.source === id);
+    }, [edges, id]);
+
+    // Check if specific handle has connection (for branch nodes)
+    const hasHandleConnection = useMemo(() => {
+      return (handleId: string) =>
+        edges.some(
+          (edge) => edge.source === id && edge.sourceHandle === handleId,
+        );
+    }, [edges, id]);
 
     if (!nodeDef) {
       return (
@@ -56,198 +72,243 @@ export const WorkflowNode: React.FC<NodeProps> = memo(
     const isSelected = selectedNodeId === id;
 
     return (
-      <div
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
-        className={cn(
-          "relative group",
-          "min-w-[180px] rounded-lg border-2 shadow-node transition-all duration-200",
-          nodeDef.color.border,
-          nodeDef.color.bg,
-          "hover:shadow-node-hover",
-          (selected || isSelected) &&
-            "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
-        )}
-      >
-        {/* Input Handle */}
-        {nodeDef.hasInput && (
-          <Handle
-            type="target"
-            position={Position.Left}
-            className="!w-3 !h-3 !bg-gray-400 dark:!bg-gray-500 !border-2 !border-white dark:!border-gray-800 hover:!bg-blue-500 transition-colors"
-          />
-        )}
-
-        {/* Node Content */}
-        <div className="p-3">
-          <div className="flex items-center gap-3">
-            {/* Icon */}
-            <div
-              className={cn(
-                "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
-                nodeDef.color.iconBg || nodeDef.color.bg,
-              )}
-            >
-              {getIcon(nodeDef.icon, {
-                className: cn("w-5 h-5", nodeDef.color.text, "text-white"),
-              })}
-            </div>
-
-            {/* Label */}
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                {nodeData.label || nodeDef.label}
-              </div>
-              {nodeDef.subtitle && (
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {nodeDef.subtitle}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Output Handles */}
-        {nodeDef.hasOutput && !nodeDef.hasBranch && (
-          <>
-            <Handle
-              type="source"
-              position={Position.Right}
-              className="!w-3 !h-3 !bg-gray-400 dark:!bg-gray-500 !border-2 !border-white dark:!border-gray-800 hover:!bg-blue-500 transition-colors"
-            />
-            {/* Add Node Button with Connector Line */}
-            <div
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full flex items-center"
-              onMouseEnter={() => setShowAddButton(true)}
-              onMouseLeave={() => setShowAddButton(false)}
-            >
-              {/* Connector Line */}
-              <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-600" />
-              {/* Add Button */}
-              <button
-                onClick={(e) => handleAddNodeClick(e)}
-                className={cn(
-                  "w-5 h-5 rounded-full flex items-center justify-center transition-all",
-                  "bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600",
-                  "hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30",
-                  showAddButton
-                    ? "opacity-100 scale-110"
-                    : "opacity-0 scale-100",
-                  "group-hover:opacity-100 group-hover:scale-100",
-                )}
-                title="Add next node"
-              >
-                <Plus className="w-3 h-3 text-gray-400 dark:text-gray-500 hover:text-blue-500" />
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Branch Handles (If/Else) */}
-        {nodeDef.hasBranch && (
-          <>
-            {/* True Handle */}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id="true"
-              className="!w-3 !h-3 !bg-green-500 !border-2 !border-white dark:!border-gray-800 hover:!bg-green-600 transition-colors"
-              style={{ top: "30%" }}
-            />
-            {/* False Handle */}
-            <Handle
-              type="source"
-              position={Position.Right}
-              id="false"
-              className="!w-3 !h-3 !bg-red-500 !border-2 !border-white dark:!border-gray-800 hover:!bg-red-600 transition-colors"
-              style={{ top: "70%" }}
-            />
-            {/* Labels */}
-            <div className="absolute right-0 top-[30%] translate-x-full pr-1 text-xs text-green-600 dark:text-green-400 font-medium">
-              T
-            </div>
-            <div className="absolute right-0 top-[70%] translate-x-full pr-1 text-xs text-red-600 dark:text-red-400 font-medium">
-              F
-            </div>
-            {/* Add Node Buttons for Branch Handles */}
-            <div
-              className="absolute right-0 top-[30%] translate-x-full translate-y-[-50%] flex items-center"
-              onMouseEnter={() => setShowAddButton(true)}
-              onMouseLeave={() => setShowAddButton(false)}
-            >
-              <div className="w-6 h-0.5 bg-gray-300 dark:bg-gray-600" />
-              <button
-                onClick={(e) => handleAddNodeClick(e, "true")}
-                className={cn(
-                  "w-4 h-4 rounded-full flex items-center justify-center transition-all",
-                  "bg-white dark:bg-gray-800 border-2 border-dashed border-green-300 dark:border-green-600",
-                  "hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/30",
-                  showAddButton
-                    ? "opacity-100 scale-110"
-                    : "opacity-0 scale-100",
-                  "group-hover:opacity-100 group-hover:scale-100",
-                )}
-                title="Add node (True branch)"
-              >
-                <Plus className="w-2.5 h-2.5 text-green-400 dark:text-green-500 hover:text-green-500" />
-              </button>
-            </div>
-            <div
-              className="absolute right-0 top-[70%] translate-x-full translate-y-[-50%] flex items-center"
-              onMouseEnter={() => setShowAddButton(true)}
-              onMouseLeave={() => setShowAddButton(false)}
-            >
-              <div className="w-6 h-0.5 bg-gray-300 dark:bg-gray-600" />
-              <button
-                onClick={(e) => handleAddNodeClick(e, "false")}
-                className={cn(
-                  "w-4 h-4 rounded-full flex items-center justify-center transition-all",
-                  "bg-white dark:bg-gray-800 border-2 border-dashed border-red-300 dark:border-red-600",
-                  "hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/30",
-                  showAddButton
-                    ? "opacity-100 scale-110"
-                    : "opacity-0 scale-100",
-                  "group-hover:opacity-100 group-hover:scale-100",
-                )}
-                title="Add node (False branch)"
-              >
-                <Plus className="w-2.5 h-2.5 text-red-400 dark:text-red-500 hover:text-red-500" />
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Tooltip */}
+      <>
         <div
+          onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           className={cn(
-            "absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap",
-            "text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded",
-            "opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none",
+            "relative group",
+            "min-w-[180px] rounded-lg border-2 shadow-node transition-all duration-200",
+            nodeDef.color.border,
+            nodeDef.color.bg,
+            "hover:shadow-node-hover",
+            (selected || isSelected) &&
+              "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
           )}
         >
-          Double-click to edit
-        </div>
+          {/* Input Handle */}
+          {nodeDef.hasInput && (
+            <Handle
+              type="target"
+              position={Position.Left}
+              isConnectable={true}
+              className="!w-4 !h-4 !bg-gray-400 dark:!bg-gray-500 !border-2 !border-white dark:!border-gray-800 hover:!bg-blue-500 hover:!scale-125 transition-all cursor-crosshair"
+            />
+          )}
 
-        {/* Delete Button (shown when selected) */}
-        {(selected || isSelected) && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteNode(id);
-            }}
+          {/* Node Content */}
+          <div className="p-3">
+            <div className="flex items-center gap-3">
+              {/* Icon */}
+              <div
+                className={cn(
+                  "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
+                  nodeDef.color.iconBg || nodeDef.color.bg,
+                )}
+              >
+                {getIcon(nodeDef.icon, {
+                  className: cn("w-5 h-5", nodeDef.color.text, "text-white"),
+                })}
+              </div>
+
+              {/* Label */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {nodeData.label || nodeDef.label}
+                </div>
+                {nodeDef.subtitle && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {nodeDef.subtitle}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Output Handles */}
+          {nodeDef.hasOutput && !nodeDef.hasBranch && (
+            <div
+              className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center"
+              onMouseEnter={() => setShowAddButton(true)}
+              onMouseLeave={() => setShowAddButton(false)}
+            >
+              {/* Connector Line - only show if no outgoing connection */}
+              {!hasOutgoingConnection && (
+                <div className="w-6 h-0.5 bg-gray-300 dark:bg-gray-600" />
+              )}
+              {/* Main Output Handle - always present for connections */}
+              <Handle
+                type="source"
+                position={Position.Right}
+                isConnectable={true}
+                className={cn(
+                  "!w-4 !h-4 !rounded-full !border-2 !border-white dark:!border-gray-800 !transition-all !cursor-crosshair",
+                  hasOutgoingConnection
+                    ? "!bg-gray-400 dark:!bg-gray-500 hover:!bg-blue-500 hover:!scale-125"
+                    : "!bg-white dark:!bg-gray-800 !border-dashed !border-gray-300 dark:!border-gray-600 hover:!border-blue-500 hover:!scale-110",
+                )}
+                style={{ position: "relative", transform: "none", top: "auto" }}
+                onClick={(e: React.MouseEvent) => {
+                  if (!hasOutgoingConnection) {
+                    e.stopPropagation();
+                    handleAddNodeClick(e);
+                  }
+                }}
+              >
+                {/* Plus icon inside handle - only show if no connection */}
+                {!hasOutgoingConnection && (
+                  <Plus
+                    className={cn(
+                      "w-2.5 h-2.5 text-gray-400 dark:text-gray-500 transition-opacity pointer-events-none",
+                      showAddButton
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100",
+                    )}
+                  />
+                )}
+              </Handle>
+            </div>
+          )}
+
+          {/* Branch Handles (If/Else) */}
+          {nodeDef.hasBranch && (
+            <>
+              {/* True Handle Container */}
+              <div
+                className="absolute right-0 top-[30%] translate-y-[-50%] flex items-center"
+                onMouseEnter={() => setShowAddButton(true)}
+                onMouseLeave={() => setShowAddButton(false)}
+              >
+                {/* Connector Line - only if no connection */}
+                {!hasHandleConnection("true") && (
+                  <div className="w-5 h-0.5 bg-gray-300 dark:bg-gray-600" />
+                )}
+                {/* True Handle */}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="true"
+                  isConnectable={true}
+                  className={cn(
+                    "!w-4 !h-4 !rounded-full !border-2 !border-white dark:!border-gray-800 !transition-all !cursor-crosshair",
+                    hasHandleConnection("true")
+                      ? "!bg-green-500 hover:!bg-green-600 hover:!scale-125"
+                      : "!bg-white dark:!bg-gray-800 !border-dashed !border-green-300 dark:!border-green-600 hover:!border-green-500 hover:!scale-110",
+                  )}
+                  style={{
+                    position: "relative",
+                    transform: "none",
+                    top: "auto",
+                  }}
+                  onClick={(e: React.MouseEvent) => {
+                    if (!hasHandleConnection("true")) {
+                      e.stopPropagation();
+                      handleAddNodeClick(e, "true");
+                    }
+                  }}
+                >
+                  {!hasHandleConnection("true") && (
+                    <Plus
+                      className={cn(
+                        "w-2.5 h-2.5 text-green-500 dark:text-green-400 transition-opacity pointer-events-none",
+                        showAddButton
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100",
+                      )}
+                    />
+                  )}
+                </Handle>
+                {/* Label */}
+                <div className="ml-1 text-xs text-green-600 dark:text-green-400 font-medium">
+                  T
+                </div>
+              </div>
+
+              {/* False Handle Container */}
+              <div
+                className="absolute right-0 top-[70%] translate-y-[-50%] flex items-center"
+                onMouseEnter={() => setShowAddButton(true)}
+                onMouseLeave={() => setShowAddButton(false)}
+              >
+                {/* Connector Line - only if no connection */}
+                {!hasHandleConnection("false") && (
+                  <div className="w-5 h-0.5 bg-gray-300 dark:bg-gray-600" />
+                )}
+                {/* False Handle */}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id="false"
+                  isConnectable={true}
+                  className={cn(
+                    "!w-4 !h-4 !rounded-full !border-2 !border-white dark:!border-gray-800 !transition-all !cursor-crosshair",
+                    hasHandleConnection("false")
+                      ? "!bg-red-500 hover:!bg-red-600 hover:!scale-125"
+                      : "!bg-white dark:!bg-gray-800 !border-dashed !border-red-300 dark:!border-red-600 hover:!border-red-500 hover:!scale-110",
+                  )}
+                  style={{
+                    position: "relative",
+                    transform: "none",
+                    top: "auto",
+                  }}
+                  onClick={(e: React.MouseEvent) => {
+                    if (!hasHandleConnection("false")) {
+                      e.stopPropagation();
+                      handleAddNodeClick(e, "false");
+                    }
+                  }}
+                >
+                  {!hasHandleConnection("false") && (
+                    <Plus
+                      className={cn(
+                        "w-2.5 h-2.5 text-red-500 dark:text-red-400 transition-opacity pointer-events-none",
+                        showAddButton
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100",
+                      )}
+                    />
+                  )}
+                </Handle>
+                {/* Label */}
+                <div className="ml-1 text-xs text-red-600 dark:text-red-400 font-medium">
+                  F
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Tooltip */}
+          <div
             className={cn(
-              "absolute -top-2 -right-2 w-5 h-5 rounded-full",
-              "bg-red-500 hover:bg-red-600 text-white",
-              "flex items-center justify-center text-xs",
-              "opacity-0 group-hover:opacity-100 transition-opacity",
-              "shadow-lg",
+              "absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap",
+              "text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded",
+              "opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none",
             )}
-            title="Delete node"
           >
-            ×
-          </button>
-        )}
-      </div>
+            Double-click to edit · Right-click for options
+          </div>
+
+          {/* Delete Button (shown when selected) */}
+          {(selected || isSelected) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteNode(id);
+              }}
+              className={cn(
+                "absolute -top-2 -right-2 w-5 h-5 rounded-full",
+                "bg-red-500 hover:bg-red-600 text-white",
+                "flex items-center justify-center text-xs",
+                "opacity-0 group-hover:opacity-100 transition-opacity",
+                "shadow-lg",
+              )}
+              title="Delete node"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </>
     );
   },
 );

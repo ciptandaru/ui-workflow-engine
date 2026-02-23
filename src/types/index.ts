@@ -133,6 +133,13 @@ export interface WorkflowState {
     sourceHandle?: string,
   ) => void;
 
+  // Node Clipboard Actions
+  duplicateNode: (nodeId: string) => void;
+  copyNode: (nodeId: string) => void;
+  pasteNode: (position?: { x: number; y: number }) => void;
+  cutNode: (nodeId: string) => void;
+  copiedNode: WorkflowNode | null;
+
   // Persistence
   saveToLocalStorage: () => void;
   loadFromLocalStorage: () => void;

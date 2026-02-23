@@ -261,6 +261,7 @@ const initialState = {
   anpEdgeInsertId: null,
   anpSourceNodeId: null,
   anpSourceHandle: null,
+  copiedNode: null,
 };
 
 export const useWorkflowStore = create<WorkflowState>()(
@@ -696,14 +697,74 @@ export const useWorkflowStore = create<WorkflowState>()(
         const sourceNode = activeWorkflow.nodes.find(
           (n) => n.id === sourceNodeId,
         );
-        const NODE_SPACING = 250;
+        const NODE_SPACING_X = 250;
+        const NODE_SPACING_Y = 150;
 
-        const newPosition = sourceNode
-          ? {
-              x: sourceNode.position.x + NODE_SPACING,
-              y: sourceNode.position.y,
+        // Calculate position based on source handle (for If/Else branching)
+        let newPosition = {
+          x: 400 + Math.random() * 200,
+          y: 200 + Math.random() * 100,
+        };
+
+        if (sourceNode) {
+          const sourceNodeDef = getNodeDefinition(sourceNode.type);
+          const hasBranch = sourceNodeDef?.hasBranch;
+
+          if (hasBranch && sourceHandle) {
+            // If/Else node - position based on branch
+            if (sourceHandle === "true") {
+              // True branch goes UP (negative Y)
+              newPosition = {
+                x: sourceNode.position.x + NODE_SPACING_X,
+                y: sourceNode.position.y - NODE_SPACING_Y,
+              };
+            } else if (sourceHandle === "false") {
+              // False branch goes DOWN (positive Y)
+              newPosition = {
+                x: sourceNode.position.x + NODE_SPACING_X,
+                y: sourceNode.position.y + NODE_SPACING_Y,
+              };
+            } else {
+              // Default output handle
+              newPosition = {
+                x: sourceNode.position.x + NODE_SPACING_X,
+                y: sourceNode.position.y,
+              };
             }
-          : { x: 400 + Math.random() * 200, y: 200 + Math.random() * 100 };
+          } else {
+            // Regular node - position to the right
+            newPosition = {
+              x: sourceNode.position.x + NODE_SPACING_X,
+              y: sourceNode.position.y,
+            };
+          }
+        }
+
+        // Check for existing nodes at the same position and adjust
+        const existingNodesAtPosition = activeWorkflow.nodes.filter(
+          (n) =>
+            Math.abs(n.position.x - newPosition.x) < 50 &&
+            Math.abs(n.position.y - newPosition.y) < 50,
+        );
+
+        if (existingNodesAtPosition.length > 0) {
+          // Find the lowest Y position among existing nodes and place below
+          const minY = Math.min(
+            ...existingNodesAtPosition.map((n) => n.position.y),
+          );
+          const maxY = Math.max(
+            ...existingNodesAtPosition.map((n) => n.position.y),
+          );
+
+          // Adjust position to avoid overlap
+          if (sourceHandle === "true") {
+            newPosition.y = minY - NODE_SPACING_Y;
+          } else if (sourceHandle === "false") {
+            newPosition.y = maxY + NODE_SPACING_Y;
+          } else {
+            newPosition.y = maxY + NODE_SPACING_Y;
+          }
+        }
 
         const newNodeId = `node-${Date.now()}`;
         const newNode: WorkflowNode = {
@@ -788,6 +849,139 @@ export const useWorkflowStore = create<WorkflowState>()(
         } catch (error) {
           console.error("Failed to load from localStorage:", error);
         }
+      },
+
+      // Node Clipboard Actions
+      duplicateNode: (nodeId: string) => {
+        const state = get();
+        const activeWorkflow = state.workflows.find(
+          (w) => w.id === state.activeWorkflowId,
+        );
+        if (!activeWorkflow) return;
+
+        const nodeToDuplicate = activeWorkflow.nodes.find(
+          (n) => n.id === nodeId,
+        );
+        if (!nodeToDuplicate) return;
+
+        const newNodeId = `node-${Date.now()}`;
+        const newNode: WorkflowNode = {
+          ...nodeToDuplicate,
+          id: newNodeId,
+          position: {
+            x: nodeToDuplicate.position.x + 50,
+            y: nodeToDuplicate.position.y + 50,
+          },
+          data: {
+            ...nodeToDuplicate.data,
+            label: `${nodeToDuplicate.data.label} (copy)`,
+          },
+        };
+
+        set((state) => ({
+          workflows: state.workflows.map((w) =>
+            w.id === state.activeWorkflowId
+              ? {
+                  ...w,
+                  nodes: [...w.nodes, newNode],
+                  updatedAt: new Date().toISOString(),
+                }
+              : w,
+          ),
+          selectedNodeId: newNodeId,
+          isRightPanelOpen: true,
+        }));
+
+        get().saveToLocalStorage();
+      },
+
+      copyNode: (nodeId: string) => {
+        const state = get();
+        const activeWorkflow = state.workflows.find(
+          (w) => w.id === state.activeWorkflowId,
+        );
+        if (!activeWorkflow) return;
+
+        const nodeToCopy = activeWorkflow.nodes.find((n) => n.id === nodeId);
+        if (!nodeToCopy) return;
+
+        set({ copiedNode: JSON.parse(JSON.stringify(nodeToCopy)) });
+      },
+
+      pasteNode: (position?: { x: number; y: number }) => {
+        const state = get();
+        if (!state.copiedNode) return;
+
+        const activeWorkflow = state.workflows.find(
+          (w) => w.id === state.activeWorkflowId,
+        );
+        if (!activeWorkflow) return;
+
+        const newNodeId = `node-${Date.now()}`;
+        const newPosition = position || {
+          x: state.copiedNode.position.x + 50,
+          y: state.copiedNode.position.y + 50,
+        };
+
+        const newNode: WorkflowNode = {
+          ...state.copiedNode,
+          id: newNodeId,
+          position: newPosition,
+          data: {
+            ...state.copiedNode.data,
+            label: `${state.copiedNode.data.label} (pasted)`,
+          },
+        };
+
+        set((state) => ({
+          workflows: state.workflows.map((w) =>
+            w.id === state.activeWorkflowId
+              ? {
+                  ...w,
+                  nodes: [...w.nodes, newNode],
+                  updatedAt: new Date().toISOString(),
+                }
+              : w,
+          ),
+          selectedNodeId: newNodeId,
+          isRightPanelOpen: true,
+        }));
+
+        get().saveToLocalStorage();
+      },
+
+      cutNode: (nodeId: string) => {
+        const state = get();
+        const activeWorkflow = state.workflows.find(
+          (w) => w.id === state.activeWorkflowId,
+        );
+        if (!activeWorkflow) return;
+
+        const nodeToCut = activeWorkflow.nodes.find((n) => n.id === nodeId);
+        if (!nodeToCut) return;
+
+        // Copy the node first
+        set({ copiedNode: JSON.parse(JSON.stringify(nodeToCut)) });
+
+        // Then delete it
+        set((state) => ({
+          workflows: state.workflows.map((w) =>
+            w.id === state.activeWorkflowId
+              ? {
+                  ...w,
+                  nodes: w.nodes.filter((n) => n.id !== nodeId),
+                  edges: w.edges.filter(
+                    (e) => e.source !== nodeId && e.target !== nodeId,
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : w,
+          ),
+          selectedNodeId: null,
+          isRightPanelOpen: false,
+        }));
+
+        get().saveToLocalStorage();
       },
     }),
     {
